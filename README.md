@@ -1,84 +1,175 @@
-# 🥬 Vegetable Classifier AI
+# 🥬 Vegetable AI Classifier
 
-Web aplikasi klasifikasi gambar sayuran menggunakan TensorFlow.js dan Deep Learning.
+> **Sistem Klasifikasi Sayuran Otomatis dengan Teknologi Deep Learning**
 
-## 🚀 Demo Live
+Web aplikasi modern untuk klasifikasi gambar sayuran menggunakan TensorFlow.js. Aplikasi ini dapat mengenali 15 jenis sayuran secara real-time langsung di browser, tanpa memerlukan server backend.
 
-Kunjungi: [https://rivaldy-25-lval.github.io/vegetable-classifier-web/](https://rivaldy-25-lval.github.io/vegetable-classifier-web/)
+[![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-4.20.0-FF6F00?logo=tensorflow)](https://www.tensorflow.org/js)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GitHub Pages](https://img.shields.io/badge/demo-live-success)](https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/)
 
-## ✨ Fitur
+## ✨ Fitur Utama
 
-- 🖼️ Upload gambar sayuran (JPG, PNG)
-- 🧠 Klasifikasi otomatis menggunakan Neural Network
-- 📊 Menampilkan confidence score dan top 5 prediksi
-- 💨 Cepat dan responsif
-- 📱 Mobile-friendly design
+- 🎯 **Akurasi Tinggi**: Model Deep Learning terlatih untuk 15 jenis sayuran
+- ⚡ **Real-time Processing**: Klasifikasi langsung di browser tanpa server
+- 📱 **Responsive Design**: Tampilan optimal di desktop, tablet, dan mobile
+- 🎨 **UI/UX Modern**: Desain elegan dengan animasi halus
+- 🔒 **Privacy First**: Semua pemrosesan dilakukan secara lokal di browser
+- 📊 **Detailed Results**: Tampilan Top-5 prediksi dengan confidence score
 
-## 🥕 Sayuran yang Dapat Dikenali
+## 🌿 Sayuran yang Dikenali
 
-Model AI ini dapat mengklasifikasikan 15 jenis sayuran:
+Aplikasi ini dapat mengklasifikasikan 15 jenis sayuran:
 
-1. Bean (Kacang)
-2. Bitter Gourd (Pare)
-3. Bottle Gourd (Labu Air)
-4. Brinjal (Terong)
-5. Broccoli
-6. Cabbage (Kubis)
-7. Capsicum (Paprika)
-8. Carrot (Wortel)
-9. Cauliflower (Kembang Kol)
-10. Cucumber (Timun)
-11. Papaya (Pepaya)
-12. Potato (Kentang)
-13. Pumpkin (Labu)
-14. Radish (Lobak)
-15. Tomato (Tomat)
+| Sayuran | Emoji | Sayuran | Emoji |
+|---------|-------|---------|-------|
+| Bean | 🫘 | Broccoli | 🥦 |
+| Bitter Gourd | 🥒 | Cabbage | 🥬 |
+| Bottle Gourd | 🍈 | Capsicum | 🫑 |
+| Brinjal (Eggplant) | 🍆 | Carrot | 🥕 |
+| Cauliflower | 🥦 | Cucumber | 🥒 |
+| Papaya | 🍈 | Potato | 🥔 |
+| Pumpkin | 🎃 | Radish | 🌰 |
+| Tomato | 🍅 | | |
 
-## 🛠️ Teknologi yang Digunakan
+## 📁 Struktur Proyek
 
-- **TensorFlow.js** - Deep Learning di browser
-- **HTML5 & CSS3** - Frontend modern
-- **Tailwind CSS** - Styling framework
-- **Convolutional Neural Network (CNN)** - Model architecture
+```
+vegetable-classifier-web/
+├── index.html              # Halaman utama aplikasi
+├── css/
+│   └── style.css          # Styling dengan desain modern
+├── js/
+│   └── script.js          # Logika aplikasi & TensorFlow.js
+├── tfjs_models/           # Model TensorFlow.js
+│   ├── model.json         # Model architecture & metadata
+│   ├── group1-shard1of2.bin
+│   └── group1-shard2of2.bin
+├── assets/                # Aset tambahan (opsional)
+├── README.md              # Dokumentasi
+├── DEPLOY_GUIDE.md        # Panduan deployment
+└── .gitignore
+```
 
-## 📦 Struktur Model
+## 🚀 Cara Menggunakan
 
-Model menggunakan arsitektur Sequential dengan:
-- Input shape: 128x128x3 (RGB images)
-- 4 Convolutional layers dengan MaxPooling
-- Fully connected layers untuk klasifikasi
-- Output: 15 classes (softmax activation)
+### Online (GitHub Pages)
 
-## 🎯 Cara Menggunakan
+Kunjungi demo live: [https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/](https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/)
 
-1. Buka website
-2. Klik atau drag & drop gambar sayuran
-3. Klik tombol "Analisis Gambar"
-4. Lihat hasil klasifikasi dan confidence score
+### Lokal (Development)
 
-## 📝 Model Training
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/Rivaldy-25-Lval/Valll-vegetable-classifier-web.git
+   cd Valll-vegetable-classifier-web
+   ```
 
-Model dilatih menggunakan:
-- Dataset: Vegetable Image Dataset
-- Framework: TensorFlow/Keras
-- Epochs: dengan Early Stopping
-- Validation accuracy: >95%
+2. **Jalankan Local Server**
+   
+   Gunakan salah satu metode berikut:
 
-## 👨‍💻 Developer
+   **Python 3:**
+   ```bash
+   python -m http.server 8000
+   ```
 
-**Eidelwise Prily Safana**
-- Email: M318D5X0520@student.devacademy.id
-- ID Dicoding: M318D5X0520
+   **Node.js (http-server):**
+   ```bash
+   npx http-server -p 8000
+   ```
+
+   **VS Code Live Server:**
+   - Install extension "Live Server"
+   - Klik kanan pada `index.html` → "Open with Live Server"
+
+3. **Buka di Browser**
+   ```
+   http://localhost:8000
+   ```
+
+## 💡 Cara Kerja
+
+1. **Upload Gambar**: Pilih atau drag & drop gambar sayuran (JPG, PNG, WebP)
+2. **Preprocessing**: Gambar otomatis di-resize ke 128×128 piksel dan dinormalisasi
+3. **Inference**: Model TensorFlow.js melakukan prediksi
+4. **Hasil**: Tampilan nama sayuran dengan confidence score dan Top-5 prediksi
+
+## 🛠️ Teknologi
+
+- **Frontend Framework**: Vanilla JavaScript (ES6+)
+- **Machine Learning**: TensorFlow.js 4.20.0
+- **Styling**: CSS3 dengan Custom Properties & Animations
+- **Architecture**: Sequential CNN (Convolutional Neural Network)
+  - Input: 128×128×3 (RGB image)
+  - Layers: 4× Conv2D + MaxPooling + Flatten + Dense
+  - Output: 15 classes (softmax)
+
+## 📦 Model Information
+
+- **Format**: TensorFlow.js Layers Model
+- **Input Shape**: `[batch, 128, 128, 3]`
+- **Output Shape**: `[batch, 15]`
+- **Total Parameters**: ~1.2M
+- **Model Size**: ~4.5MB
+- **Framework**: Keras → TensorFlow.js Converter
+
+## 🎨 Desain & UI/UX
+
+- **Color Scheme**: Gradient modern (Purple to Pink)
+- **Typography**: Inter (body) & Poppins (headings)
+- **Animations**: Smooth transitions & keyframe animations
+- **Responsive Breakpoints**: 480px, 768px, 1200px
+- **Accessibility**: Semantic HTML & ARIA labels
+
+## 🔧 Pengembangan
+
+### Prerequisites
+- Browser modern (Chrome, Firefox, Safari, Edge)
+- Text editor (VS Code, Sublime, etc.)
+- Local server (Python, Node.js, atau VS Code Live Server)
+
+### Testing
+1. Test dengan berbagai gambar sayuran
+2. Periksa DevTools → Console untuk logs
+3. Verifikasi Network → model.json & shards berhasil dimuat
+
+### Debugging
+Akses debug utilities di browser console:
+```javascript
+window.VegetableClassifier.logMemoryUsage()  // Cek penggunaan memory TensorFlow.js
+window.VegetableClassifier.CONFIG            // Lihat konfigurasi
+```
+
+## 🌐 Deployment ke GitHub Pages
+
+Lihat [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) untuk instruksi lengkap deployment ke GitHub Pages.
+
+**Quick Deploy:**
+```bash
+git add .
+git commit -m "Deploy vegetable classifier"
+git push origin main
+```
+
+Kemudian aktifkan GitHub Pages di: **Settings → Pages → Source: main / root**
 
 ## 📄 License
 
-© 2025 Vegetable AI Classifier. All rights reserved.
+MIT License - silakan gunakan dan modifikasi sesuai kebutuhan.
 
-## 🔗 Links
+## 👨‍💻 Author
 
-- [GitHub Repository](https://github.com/Rivaldy-25-Lval/vegetable-classifier-web)
-- [Report Issues](https://github.com/Rivaldy-25-Lval/vegetable-classifier-web/issues)
+**Muhammad Rivaldy Pratama**
+
+- GitHub: [@Rivaldy-25-Lval](https://github.com/Rivaldy-25-Lval)
+
+## 🙏 Acknowledgments
+
+- TensorFlow.js team untuk framework yang powerful
+- Google Fonts untuk typography
+- Komunitas open source
 
 ---
 
-Made with ❤️ using TensorFlow.js
+**Made with ❤️ and TensorFlow.js**
