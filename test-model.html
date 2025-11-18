@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Model Loading</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #667eea; }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .loading { background: #fff3cd; color: #856404; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="test-box">
+        <h1>🧪 Test Model Loading</h1>
+        <p>Halaman ini untuk testing apakah model bisa dimuat dengan benar.</p>
+        
+        <button onclick="testModelPaths()">🔍 Test All Paths</button>
+        <button onclick="testDirectLoad()">⚡ Test Direct Load</button>
+        <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        
+        <div id="status"></div>
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        const modelPaths = [
+            'tfjs_models/model.json',
+            './tfjs_models/model.json',
+            '/Valll-vegetable-classifier-web/tfjs_models/model.json',
+            'https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/tfjs_models/model.json'
+        ];
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logElement = document.createElement('div');
+            logElement.className = `status ${type}`;
+            logElement.innerHTML = message;
+            logsDiv.appendChild(logElement);
+            console.log(message);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('status').innerHTML = '';
+        }
+
+        async function testModelPaths() {
+            clearLogs();
+            document.getElementById('status').innerHTML = '<div class="status loading">🔄 Testing all model paths...</div>';
+            
+            log('<strong>Current URL:</strong> ' + window.location.href);
+            log('<strong>Origin:</strong> ' + window.location.origin);
+            log('');
+            
+            for (let i = 0; i < modelPaths.length; i++) {
+                const path = modelPaths[i];
+                log(`<strong>Testing path ${i + 1}/${modelPaths.length}:</strong> ${path}`, 'loading');
+                
+                try {
+                    // Test fetch first
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        log(`✅ Fetch successful (Status: ${response.status})`, 'success');
+                        
+                        // Try to load model
+                        log('🔄 Attempting to load TensorFlow.js model...', 'loading');
+                        const model = await tf.loadLayersModel(path);
+                        log(`✅✅✅ MODEL LOADED SUCCESSFULLY!`, 'success');
+                        log(`📊 Input shape: ${model.inputs[0].shape}`);
+                        log(`📊 Output shape: ${model.outputs[0].shape}`);
+                        
+                        document.getElementById('status').innerHTML = 
+                            `<div class="status success">✅ SUCCESS! Model dapat dimuat dari:<br><code>${path}</code></div>`;
+                        
+                        return; // Success!
+                    } else {
+                        log(`❌ Fetch failed (Status: ${response.status})`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ Error: ${error.message}`, 'error');
+                }
+                
+                log('');
+            }
+            
+            document.getElementById('status').innerHTML = 
+                '<div class="status error">❌ Semua path gagal. Model tidak dapat dimuat dari path manapun.</div>';
+        }
+
+        async function testDirectLoad() {
+            clearLogs();
+            document.getElementById('status').innerHTML = '<div class="status loading">⚡ Testing direct load...</div>';
+            
+            const directPath = 'https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/tfjs_models/model.json';
+            
+            try {
+                log(`Testing: ${directPath}`, 'loading');
+                
+                // Check if files exist
+                log('Checking model.json...', 'loading');
+                const modelResponse = await fetch(directPath);
+                log(`model.json status: ${modelResponse.status}`, modelResponse.ok ? 'success' : 'error');
+                
+                if (modelResponse.ok) {
+                    const modelJson = await modelResponse.json();
+                    log(`✅ model.json loaded: ${JSON.stringify(modelJson).substring(0, 100)}...`);
+                    
+                    // Check bin files
+                    for (const manifest of modelJson.weightsManifest) {
+                        for (const path of manifest.paths) {
+                            const binUrl = directPath.replace('model.json', path);
+                            log(`Checking ${path}...`, 'loading');
+                            const binResponse = await fetch(binUrl);
+                            log(`${path} status: ${binResponse.status} (${binResponse.headers.get('content-length')} bytes)`, 
+                                binResponse.ok ? 'success' : 'error');
+                        }
+                    }
+                    
+                    // Try to load the model
+                    log('🔄 Loading full model...', 'loading');
+                    const model = await tf.loadLayersModel(directPath);
+                    log('✅✅✅ MODEL LOADED SUCCESSFULLY!', 'success');
+                    
+                    document.getElementById('status').innerHTML = 
+                        '<div class="status success">✅ SUCCESS! Model berhasil dimuat!</div>';
+                } else {
+                    log('❌ Cannot fetch model.json', 'error');
+                    document.getElementById('status').innerHTML = 
+                        '<div class="status error">❌ Failed to fetch model.json</div>';
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+                document.getElementById('status').innerHTML = 
+                    `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Test page loaded. Click button to start testing.', 'info');
+        });
+    </script>
+</body>
+</html>
