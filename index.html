@@ -1,751 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EizVall4Ever - Neural Interface</title>
-    
-    <!-- 1. Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
-    <!-- 3. Babel (Untuk menerjemahkan JSX ke JS di browser) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- 4. TensorFlow.js -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Vegetable AI Classifier</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-
-    <!-- Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=VT323&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-
     <style>
-        body { background-color: #020c1b; color: white; margin: 0; overflow-x: hidden; }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #020c1b; }
-        ::-webkit-scrollbar-thumb { background: #00d1ff; border-radius: 4px; }
+      :root{--bg1:#0f172a;--card:#ffffffee;--accent1:#7c3aed;--accent2:#06b6d4}
+      html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial}
+      body{background:linear-gradient(180deg,#071025 0%,#071025 40%,#021024 100%);color:#e6eef8;display:flex;align-items:center;justify-content:center;padding:32px}
+      .wrap{width:100%;max-width:920px}
+      .hero{display:flex;gap:28px;align-items:stretch}
+      .left{flex:1;background:var(--card);border-radius:16px;padding:22px;color:#0b1220;box-shadow:0 10px 40px rgba(2,6,23,0.6)}
+      .right{width:380px;min-width:300px}
+      h1{margin:0;font-size:28px}
+      p.lead{margin:6px 0 18px;color:#334155}
+      .upload{border:2px dashed #cbd5e0;border-radius:12px;padding:18px;text-align:center;cursor:pointer;background:#fafafa}
+      .upload.drag{background:#f0f9ff;border-color:var(--accent2)}
+      .btn{display:inline-block;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:white;font-weight:700;text-decoration:none}
+      img.preview{max-width:100%;border-radius:10px;display:block;margin:12px auto}
+      .result{background:linear-gradient(180deg,rgba(124,58,237,0.15),rgba(6,182,212,0.06));padding:16px;border-radius:10px;color:#e6eef8}
+      .bar{height:18px;background:#0b1220;border-radius:8px;overflow:hidden}
+      .fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent1));width:0%}
+      .muted{color:#94a3b8;font-size:13px}
+      .footer{margin-top:18px;color:#94a3b8;font-size:13px;text-align:center}
+      .bg-dot{position:fixed;border-radius:50%;opacity:.06;filter:blur(18px)}
     </style>
-</head>
-<body>
-    <div id="root"></div>
+  </head>
+  <body>
+    <div class="bg-dot" style="width:260px;height:260px;left:10%;top:6%;background:linear-gradient(90deg,#06b6d4,#7c3aed)"></div>
+    <div class="bg-dot" style="width:380px;height:380px;right:6%;bottom:10%;background:linear-gradient(90deg,#7c3aed,#06b6d4)"></div>
 
-    <script type="text/babel">
-        // --- SETUP REACT UTILS ---
-        const { useState, useEffect, useRef } = React;
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <h1>🥬 Vegetable AI Classifier</h1>
+          <p class="lead">Upload gambar sayuran, sistem akan mengklasifikasikan secara otomatis menggunakan model TensorFlow.js</p>
+        </div>
+        <div style="text-align:right">
+          <div class="muted">Model: 15 classes • Input 128x128</div>
+        </div>
+      </div>
 
-        // --- ICONS ---
-        const IconWrapper = ({ children, className }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                {children}
-            </svg>
-        );
+      <div class="hero">
+        <div class="left">
+          <div id="uploadArea" class="upload" tabindex="0">
+            <div id="uploadText">Klik untuk memilih atau drag & drop gambar</div>
+            <input id="fileInput" type="file" accept="image/*" style="display:none">
+            <img id="preview" class="preview" style="display:none">
+            <div style="margin-top:8px"><a id="chooseBtn" class="btn">Pilih Gambar</a></div>
+          </div>
 
-        const Upload = ({ className }) => <IconWrapper className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconWrapper>;
-        const ImageIcon = ({ className }) => <IconWrapper className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconWrapper>;
-        const X = ({ className }) => <IconWrapper className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconWrapper>;
-        const Cpu = ({ className }) => <IconWrapper className={className}><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></IconWrapper>;
-        const Scan = ({ className }) => <IconWrapper className={className}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></IconWrapper>;
-        const CheckCircle2 = ({ className }) => <IconWrapper className={className}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></IconWrapper>;
-        const BarChart3 = ({ className }) => <IconWrapper className={className}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></IconWrapper>;
-        const Zap = ({ className }) => <IconWrapper className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></IconWrapper>;
-        const Power = ({ className }) => <IconWrapper className={className}><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" x2="12" y1="2" y2="12"/></IconWrapper>;
+          <div id="controls" style="margin-top:14px;display:none;gap:8px">
+            <button id="predictBtn" class="btn">🔍 Analisis</button>
+            <button id="resetBtn" style="margin-left:8px;padding:10px 14px;border-radius:10px;background:#e6eef8;border:none;cursor:pointer">Reset</button>
+          </div>
 
-        // --- MAIN APP COMPONENT ---
-        function App() {
-            const [appState, setAppState] = useState('loading');
-            
-            // State untuk Dashboard
-            const [selectedFile, setSelectedFile] = useState(null);
-            const [previewUrl, setPreviewUrl] = useState(null);
-            const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [results, setResults] = useState(null);
-            const [scanProgress, setScanProgress] = useState(0);
-            
-            // TensorFlow.js Model State
-            const [model, setModel] = useState(null);
-            const [modelLoaded, setModelLoaded] = useState(false);
+          <div id="status" style="margin-top:12px"></div>
 
-            // Load Model saat Dashboard dibuka
-            useEffect(() => {
-                if (appState === 'dashboard' && !modelLoaded) {
-                    loadTFModel();
-                }
-            }, [appState]);
+          <div class="footer">© 2025 Vegetable AI Classifier | Made with ❤️</div>
+        </div>
 
-            const loadTFModel = async () => {
-                try {
-                    console.log('🔄 Loading TensorFlow.js model...');
-                    const loadedModel = await tf.loadLayersModel('tfjs_models/model.json');
-                    setModel(loadedModel);
-                    setModelLoaded(true);
-                    console.log('✅ Model loaded successfully!');
-                    
-                    // Warm up
-                    const dummy = tf.zeros([1, 128, 128, 3]);
-                    loadedModel.predict(dummy).dispose();
-                    dummy.dispose();
-                    console.log('✅ Model warmed up!');
-                } catch (error) {
-                    console.error('❌ Error loading model:', error);
-                    alert('Gagal memuat model AI. Pastikan folder tfjs_models tersedia.');
-                }
-            };
+        <div class="right">
+          <div class="result">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div class="muted">Hasil Teratas</div>
+                <div id="topLabel" style="font-size:20px;font-weight:800;margin-top:6px">-</div>
+              </div>
+              <div id="topEmoji" style="font-size:34px">🥬</div>
+            </div>
 
-            // Background Logic
-            const showGlobalBg = appState !== 'dashboard' && appState !== 'gallery' && appState !== 'flashback');
+            <div style="margin-top:12px">
+              <div class="muted">Confidence</div>
+              <div class="bar" style="margin-top:6px"><div id="topBar" class="fill"></div></div>
+            </div>
 
-            // State Transitions
-            const handleIntroComplete = () => setAppState('title');
-            const handleStartClick = () => setAppState('flashback');
-            const handleFlashbackComplete = () => setAppState('message');
-            const handleMessageNext = () => setAppState('login');
-            const handleLoginSuccess = () => setAppState('gallery');
-            const handleEnterDashboard = () => setAppState('dashboard');
+            <div style="margin-top:16px">
+              <div class="muted">Top 5 Prediksi</div>
+              <div id="top5" style="margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-            return (
-                <div className="min-h-screen font-sans text-white overflow-hidden relative">
-                <GlobalStyles />
+    <script>
+      const MODEL_PATH = 'tfjs_models/model.json';
+      const IMAGE_SIZE = 128;
+      const CLASS_LABELS = [
+        'Bean','Bitter_Gourd','Bottle_Gourd','Brinjal','Broccoli','Cabbage','Capsicum','Carrot','Cauliflower','Cucumber','Papaya','Potato','Pumpkin','Radish','Tomato'
+      ];
+      const EMOJI = {Bean:'🫘',Bitter_Gourd:'🥒',Bottle_Gourd:'🍈',Brinjal:'🍆',Broccoli:'🥦',Cabbage:'🥬',Capsicum:'🫑',Carrot:'🥕',Cauliflower:'🥦',Cucumber:'🥒',Papaya:'🍈',Potato:'🥔',Pumpkin:'🎃',Radish:'🌰',Tomato:'🍅'};
 
-                {/* Main Background (Starfield) for Intro Phases */}
-                {showGlobalBg && <MainBackgroundCanvas />}
+      let model = null;
+      const fileInput = document.getElementById('fileInput');
+      const uploadArea = document.getElementById('uploadArea');
+      const chooseBtn = document.getElementById('chooseBtn');
+      const preview = document.getElementById('preview');
+      const controls = document.getElementById('controls');
+      const predictBtn = document.getElementById('predictBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const status = document.getElementById('status');
+      const topLabel = document.getElementById('topLabel');
+      const topEmoji = document.getElementById('topEmoji');
+      const topBar = document.getElementById('topBar');
+      const top5 = document.getElementById('top5');
 
-                {appState === 'loading' && <LoadingScreen onComplete={handleIntroComplete} />}
-                {appState === 'title' && <TitleScreen onStart={handleStartClick} />}
-                {appState === 'flashback' && <FlashbackScreen onComplete={handleFlashbackComplete} />}
-                {appState === 'message' && <MessageScreen onNext={handleMessageNext} />}
-                {appState === 'login' && <LoginScreen onSuccess={handleLoginSuccess} onCancel={() => setAppState('title')} />}
-                {appState === 'gallery' && <GalleryScreen onEnterSystem={handleEnterDashboard} />}
-
-                {appState === 'dashboard' && (
-                    <Dashboard 
-                        selectedFile={selectedFile}
-                        previewUrl={previewUrl}
-                        isAnalyzing={isAnalyzing}
-                        results={results}
-                        scanProgress={scanProgress}
-                        onFileChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                                setSelectedFile(file);
-                                setPreviewUrl(URL.createObjectURL(file));
-                                setResults(null);
-                                setIsAnalyzing(false);
-                                setScanProgress(0);
-                            }
-                        }}
-                        onReset={() => {
-                            setSelectedFile(null);
-                            setPreviewUrl(null);
-                            setResults(null);
-                            setIsAnalyzing(false);
-                            setScanProgress(0);
-                        }}
-                        onAnalyze={async () => {
-                            if (!selectedFile || !modelLoaded || !model) {
-                                alert('⏳ Model belum siap atau file belum dipilih');
-                                return;
-                            }
-                            
-                            setIsAnalyzing(true);
-                            setScanProgress(0);
-                            const interval = setInterval(() => {
-                                setScanProgress((prev) => {
-                                    if (prev >= 90) {
-                                        clearInterval(interval);
-                                        return 90;
-                                    }
-                                    return prev + 10; 
-                                });
-                            }, 200);
-                            
-                            try {
-                                // Class labels sesuai model
-                                const classLabels = [
-                                    'Bean', 'Bitter_Gourd', 'Bottle_Gourd', 'Brinjal', 'Broccoli',
-                                    'Cabbage', 'Capsicum', 'Carrot', 'Cauliflower', 'Cucumber',
-                                    'Papaya', 'Potato', 'Pumpkin', 'Radish', 'Tomato'
-                                ];
-                                
-                                // Create image element
-                                const img = new Image();
-                                img.src = previewUrl;
-                                await new Promise((resolve) => { img.onload = resolve; });
-                                
-                                // Preprocess
-                                let tensor = tf.browser.fromPixels(img)
-                                    .resizeBilinear([128, 128])
-                                    .toFloat()
-                                    .div(255.0)
-                                    .expandDims(0);
-                                
-                                console.log('📊 Tensor:', tensor.shape);
-                                
-                                // Predict
-                                const predictions = model.predict(tensor);
-                                const predData = await predictions.data();
-                                console.log('📈 Predictions:', predData);
-                                
-                                // Cleanup
-                                tensor.dispose();
-                                predictions.dispose();
-                                
-                                // Top 5
-                                const predArray = Array.from(predData);
-                                const indexed = predArray.map((prob, idx) => ({
-                                    label: classLabels[idx].replace(/_/g, ' '),
-                                    confidence: (prob * 100).toFixed(1)
-                                }));
-                                indexed.sort((a, b) => parseFloat(b.confidence) - parseFloat(a.confidence));
-                                const top5 = indexed.slice(0, 4);
-                                
-                                console.log('🏆 Top:', top5);
-                                
-                                clearInterval(interval);
-                                setScanProgress(100);
-                                
-                                setTimeout(() => {
-                                    setIsAnalyzing(false);
-                                    setResults(top5);
-                                }, 500);
-                                
-                            } catch (error) {
-                                console.error('❌ Error:', error);
-                                clearInterval(interval);
-                                setIsAnalyzing(false);
-                                alert('❌ Gagal menganalisis gambar');
-                            }
-                        }}
-                    />
-                )}
-                
-                {appState !== 'dashboard' && appState !== 'flashback' && (
-                    <div id="footer-logo" className="fixed bottom-8 right-8 text-2xl tracking-[0.3em] z-50 text-[#00d1ff] font-orbitron animate-pulse">
-                    Llvall
-                    </div>
-                )}
-                </div>
-            );
+      async function init(){
+        setStatus('Memuat model...');
+        try{
+          model = await tf.loadLayersModel(MODEL_PATH);
+          // warmup
+          const dummy = tf.zeros([1,IMAGE_SIZE,IMAGE_SIZE,3]);
+          model.predict(dummy).dispose();
+          dummy.dispose();
+          setStatus('Model siap ✔️');
+        }catch(err){
+          console.error(err);
+          setStatus('❌ Gagal memuat model. Pastikan folder tfjs_models tersedia dan berisi model.json serta shard files. Cek DevTools -> Network.');
         }
+      }
 
-        // --- SUB COMPONENTS ---
+      function setStatus(txt){status.innerHTML = '<div class="muted">'+txt+'</div>'}
 
-        const MainBackgroundCanvas = () => {
-            const canvasRef = useRef(null);
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                let width = canvas.width = window.innerWidth;
-                let height = canvas.height = window.innerHeight;
-                let points = [];
-                let animationFrameId;
+      chooseBtn.addEventListener('click',()=>fileInput.click());
+      uploadArea.addEventListener('click',()=>fileInput.click());
+      fileInput.addEventListener('change',(e)=>{handleFile(e.target.files[0])});
 
-                const init = () => {
-                    points = [];
-                    const pointsCount = Math.floor(width * height / 12000);
-                    for (let i = 0; i < pointsCount; i++) {
-                        points.push({ 
-                            x: Math.random() * width, 
-                            y: Math.random() * height, 
-                            vx: (Math.random() - 0.5) * 0.3, 
-                            vy: (Math.random() - 0.5) * 0.3, 
-                            radius: 1 + Math.random() * 2 
-                        });
-                    }
-                };
+      uploadArea.addEventListener('dragover',(e)=>{e.preventDefault();uploadArea.classList.add('drag')});
+      uploadArea.addEventListener('dragleave',(e)=>{e.preventDefault();uploadArea.classList.remove('drag')});
+      uploadArea.addEventListener('drop',(e)=>{e.preventDefault();uploadArea.classList.remove('drag');handleFile(e.dataTransfer.files[0])});
 
-                const draw = () => {
-                    ctx.clearRect(0, 0, width, height);
-                    points.forEach(p1 => {
-                        p1.x += p1.vx; p1.y += p1.vy;
-                        if (p1.x < 0 || p1.x > width) p1.vx *= -1;
-                        if (p1.y < 0 || p1.y > height) p1.vy *= -1;
-                        ctx.beginPath(); 
-                        ctx.arc(p1.x, p1.y, p1.radius, 0, Math.PI * 2); 
-                        ctx.fillStyle = 'rgba(0, 209, 255, 0.8)'; 
-                        ctx.fill();
-                        points.forEach(p2 => {
-                            const dx = p1.x - p2.x; 
-                            const dy = p1.y - p2.y; 
-                            const dist = Math.sqrt(dx * dx + dy * dy);
-                            if (dist < 150) {
-                                ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); 
-                                ctx.strokeStyle = `rgba(0, 209, 255, ${1 - dist / 150})`; ctx.lineWidth = 0.7; ctx.stroke();
-                            }
-                        });
-                    });
-                    animationFrameId = requestAnimationFrame(draw);
-                };
-                init(); draw();
-                const handleResize = () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; init(); };
-                window.addEventListener('resize', handleResize);
-                return () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animationFrameId); };
-            }, []);
-            return <canvas ref={canvasRef} className="fixed inset-0 z-0 bg-[#020c1b]" />;
+      function handleFile(file){
+        if(!file) return;
+        if(!file.type.startsWith('image/')){alert('Mohon pilih file gambar');return}
+        const reader=new FileReader();
+        reader.onload=function(ev){
+          preview.src = ev.target.result; preview.style.display='block'; controls.style.display='flex'; setStatus('Gambar siap. Tekan Analisis.');
         };
+        reader.readAsDataURL(file);
+      }
 
-        // --- LOADING SCREEN (SIMPLE & CLEAN like Reference) ---
-        const LoadingScreen = ({ onComplete }) => {
-            const [percentage, setPercentage] = useState(0);
-            useEffect(() => {
-                const interval = setInterval(() => {
-                setPercentage(prev => {
-                    if (prev >= 100) {
-                        clearInterval(interval);
-                        setTimeout(onComplete, 500);
-                        return 100;
-                    }
-                    return prev + 1;
-                });
-                }, 30);
-                return () => clearInterval(interval);
-            }, [onComplete]);
-            
-            return (
-                <div className="fixed inset-0 z-50 bg-[#020c1b] flex items-center justify-center">
-                    <p className="text-5xl font-orbitron text-[#00d1ff]">
-                        {percentage}%
-                    </p>
-                </div>
-            );
-        };
+      resetBtn.addEventListener('click',()=>{preview.src='';preview.style.display='none';controls.style.display='none'; topLabel.textContent='-'; topEmoji.textContent='🥬'; topBar.style.width='0%'; top5.innerHTML=''; setStatus('')});
 
-        // --- TITLE SCREEN (MATCHING REFERENCE STYLE) ---
-        const TitleScreen = ({ onStart }) => (
-            <div className="fixed inset-0 z-20 flex flex-col items-center justify-center p-8 animate-screen-in">
-                {/* Kotak Panel Transparan */}
-                <div className="text-center mb-8 bg-black bg-opacity-25 p-4 rounded-lg border border-[#00d1ff]/10 shadow-[0_0_15px_rgba(0,209,255,0.1)]">
-                    <h1 className="text-3xl md:text-4xl font-bold tracking-wider font-orbitron text-[#00d1ff] mb-2">
-                        EIZVALL4EVER
-                    </h1>
-                    <p className="text-md tracking-[0.2em] opacity-80 font-orbitron text-[#00d1ff]">
-                        — SYSTEM INTERFACE —
-                    </p>
-                    <p className="text-xs tracking-widest opacity-60 font-orbitron text-[#00d1ff] mt-2">
-                        EIZVALL V.1.0
-                    </p>
-                </div>
-                
-                {/* Tombol Bulat Asli */}
-                <button 
-                    onClick={onStart} 
-                    className="start-button font-orbitron flex items-center justify-center text-xl"
-                >
-                    START
-                </button>
-            </div>
-        );
+      predictBtn.addEventListener('click',async ()=>{
+        if(!model){alert('Model belum siap');return}
+        if(!preview.src){alert('Pilih gambar terlebih dahulu');return}
 
-        const CyberRain = () => {
-            const canvasRef = useRef(null);
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                let width = canvas.width = window.innerWidth;
-                let height = canvas.height = window.innerHeight;
-                const fontSize = 16;
-                const columns = Math.floor(width / fontSize);
-                const drops = Array(columns).fill(1);
-                const chars = "EIZVALL4EVER01"; 
+        setStatus('Menganalisis...');
+        try{
+          const img = new Image(); img.src = preview.src; await new Promise(r=>img.onload=r);
+          let tensor = tf.browser.fromPixels(img).resizeBilinear([IMAGE_SIZE,IMAGE_SIZE]).toFloat().div(255.0).expandDims(0);
+          const preds = model.predict(tensor);
+          const data = await preds.data();
+          tensor.dispose(); if(preds.dispose) preds.dispose();
 
-                const draw = () => {
-                    ctx.fillStyle = 'rgba(2, 12, 27, 0.1)'; 
-                    ctx.fillRect(0, 0, width, height);
-                    ctx.fillStyle = '#00d1ff'; 
-                    ctx.font = '14px "Orbitron", monospace'; 
-                    for (let i = 0; i < drops.length; i++) {
-                        const text = chars[Math.floor(Math.random() * chars.length)];
-                        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                        if (drops[i] * fontSize > height && Math.random() > 0.98) { drops[i] = 0; }
-                        drops[i]++;
-                    }
-                    requestAnimationFrame(draw);
-                };
-                let animationFrameId = requestAnimationFrame(draw);
-                const handleResize = () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; };
-                window.addEventListener('resize', handleResize);
-                return () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animationFrameId); };
-            }, []);
-            return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-0 bg-[#020c1b]" />;
-        };
+          const arr = Array.from(data).map((p,i)=>({label:CLASS_LABELS[i].replace(/_/g,' '),prob:p})); arr.sort((a,b)=>b.prob-a.prob);
+          const top = arr.slice(0,5);
 
-        // --- FLASHBACK SCREEN (Updated for Aesthetics) ---
-        const FlashbackScreen = ({ onComplete }) => {
-            const canvasRef = useRef(null);
-            const [text, setText] = useState('');
-            const [subText, setSubText] = useState('');
+          topLabel.textContent = top[0].label;
+          topEmoji.textContent = EMOJI[top[0].label.replace(/ /g,'_')] || '🥬';
+          topBar.style.width = Math.round(top[0].prob*100) + '%';
 
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                let width = canvas.width = window.innerWidth;
-                let height = canvas.height = window.innerHeight;
-                let animationFrameId;
-                const colors = ['#6366f1', '#8b5cf6', '#06b6d4', '#ec4899', '#d946ef', '#ffffff']; 
-                const particles = Array.from({ length: 800 }, () => ({ 
-                    x: (Math.random() - 0.5) * width, 
-                    y: (Math.random() - 0.5) * height, 
-                    z: Math.random() * width, 
-                    pz: Math.random() * width, 
-                    color: colors[Math.floor(Math.random() * colors.length)] 
-                }));
+          top5.innerHTML = '';
+          top.forEach(t=>{
+            const row = document.createElement('div'); row.style.display='flex';row.style.justifyContent='space-between';row.style.alignItems='center';row.style.marginTop='8px';
+            const left = document.createElement('div'); left.textContent = (EMOJI[t.label.replace(/ /g,'_')]||'') + ' ' + t.label; left.style.fontWeight='600';
+            const right = document.createElement('div'); right.textContent = Math.round(t.prob*100) + '%'; right.style.opacity='0.9';
+            row.appendChild(left); row.appendChild(right); top5.appendChild(row);
+            const barWrap = document.createElement('div'); barWrap.className='bar'; barWrap.style.marginTop='6px'; const f = document.createElement('div'); f.className='fill'; f.style.width = '0%'; barWrap.appendChild(f); top5.appendChild(barWrap);
+            setTimeout(()=>{f.style.width = Math.round(t.prob*100) + '%'},100);
+          })
 
-                const draw = () => {
-                    ctx.fillStyle = 'rgba(2, 12, 27, 0.3)'; // Darker trails for better contrast
-                    ctx.fillRect(0, 0, width, height); 
-                    ctx.save(); 
-                    ctx.translate(width / 2, height / 2);
-                    particles.forEach(p => {
-                        p.pz = p.z; p.z -= 20; 
-                        if(p.z <= 0) { p.x = (Math.random() - 0.5) * width; p.y = (Math.random() - 0.5) * height; p.z = width; p.pz = width; }
-                        const k = 128 / p.z; const px = p.x * k; const py = p.y * k; const prev_k = 128 / p.pz; const prev_px = p.x * prev_k; const prev_py = p.y * prev_k; 
-                        const size = (1 - p.z / width) * 3;
-                        ctx.beginPath(); ctx.moveTo(prev_px, prev_py); ctx.lineTo(px, py); ctx.lineWidth = size < 0.5 ? 0.5 : size; ctx.strokeStyle = p.color; ctx.stroke();
-                    });
-                    ctx.restore(); animationFrameId = requestAnimationFrame(draw);
-                }
-                draw();
-                
-                // Sequence of texts
-                const sequence = [
-                    { main: "SYSTEM FRAGMENT", sub: "DETECTED..." },
-                    { main: "CREATED BY VALL", sub: "DIGITAL SIGNATURE VERIFIED" },
-                    { main: "ETERNAL DEDICATION", sub: "ENCRYPTED MEMORY" },
-                    { main: "FOR EIZ", sub: "ETERNAL PARTNER" },
-                    { main: "EIZVALL4EVER", sub: "ONLINE" }
-                ];
+          setStatus('Selesai');
+        }catch(err){console.error(err); setStatus('❌ Gagal menganalisis gambar')}
+      });
 
-                let index = 0;
-                const interval = setInterval(() => {
-                    if (index < sequence.length) {
-                        setText(sequence[index].main);
-                        setSubText(sequence[index].sub);
-                        index++;
-                    } else {
-                        clearInterval(interval);
-                        setTimeout(onComplete, 2000);
-                    }
-                }, 2500); // Slower pace
-
-                return () => { cancelAnimationFrame(animationFrameId); clearInterval(interval); };
-            }, [onComplete]);
-            
-            return (
-                <div className="screen active bg-black z-40 flex items-center justify-center h-screen w-full fixed inset-0">
-                    <canvas ref={canvasRef} className="absolute inset-0" />
-                    <div className="absolute flex flex-col items-center justify-center text-center px-4 z-50">
-                        <h2 className="text-xl md:text-3xl text-white font-light tracking-[0.5em] animate-fade-in-up font-orbitron mb-4" style={{ textShadow: '0 0 20px rgba(0, 209, 255, 0.7)' }}>
-                            {text}
-                        </h2>
-                        <p className="text-sm md:text-base text-cyan-400 font-vt323 tracking-[0.3em] animate-pulse">
-                            {subText}
-                        </p>
-                    </div>
-                </div>
-            );
-        };
-
-        const MessageScreen = ({ onNext }) => (
-            <div className="screen active w-full p-8 z-10 flex items-center justify-center h-screen animate-screen-in">
-                <div className="w-full max-w-2xl text-lg">
-                    <div className="w-full p-8 bg-black bg-opacity-60 border border-gray-700 rounded-md backdrop-blur-sm shadow-[0_0_20px_rgba(0,209,255,0.2)]">
-                        <p className="leading-relaxed font-sans text-[#00d1ff] space-y-2">
-                            <span className="block animate-fade-in delay-100">「劇場版ソードアート・オンライン-プログレッシブ-星なき夜のアリア」にて</span>
-                            <span className="block animate-fade-in delay-300">結城明日奈が《ソードアート・オンライン》を設定する際に決めた</span>
-                            <span className="block animate-fade-in delay-500">パスワードを入力してください。</span>
-                            <span className="block animate-fade-in delay-700">正解は本編にてご確認いただけます。</span>
-                        </p>
-                        <div className="flex justify-end mt-6">
-                            <button onClick={onNext} className="text-xl tracking-widest hover:text-white transition-colors duration-300 text-[#00d1ff] font-orbitron">Next &gt;</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-
-        const LoginScreen = ({ onSuccess, onCancel }) => {
-            const [password, setPassword] = useState('');
-            const [error, setError] = useState('');
-            const correctPasswords = ["adminlval", "iris"];
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (correctPasswords.includes(password)) { setError('ACCESS GRANTED...'); setTimeout(onSuccess, 1000); } 
-                else { setError('ACCESS DENIED. PASSWORD INCORRECT.'); setPassword(''); setTimeout(() => setError(''), 2000); }
-            };
-            return (
-                <div className="screen active p-8 flex flex-col items-center justify-center z-10 h-screen animate-screen-in">
-                <div className="w-full max-w-2xl p-8 border-2 border-[#00d1ff] bg-black bg-opacity-80 rounded-lg shadow-[0_0_30px_rgba(0,209,255,0.4)] flex flex-col backdrop-blur-md">
-                    <h2 className="text-2xl text-center mb-8 font-orbitron text-[#00d1ff]">Please create new user.</h2>
-                    <form onSubmit={handleSubmit} className="w-full">
-                    <div className="flex items-center mb-6">
-                        <label className="w-1/4 text-xl font-orbitron text-[#00d1ff]">User name</label>
-                        <div className="w-3/4">
-                        <input type="text" value="eiz" disabled className="w-full bg-transparent border-none text-2xl text-[#00d1ff] font-orbitron outline-none" />
-                        <div className="h-px bg-[#00d1ff] mt-1"></div>
-                        <p className="text-sm opacity-70 mt-1 text-[#00d1ff] font-vt323">01 - 011101 &lt; // Character Create user name</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center mb-8">
-                        <label className="w-1/4 text-xl font-orbitron text-[#00d1ff]">Password</label>
-                        <div className="w-3/4">
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-transparent border-none text-2xl text-[#00d1ff] font-orbitron outline-none focus:text-white transition-colors" autoFocus />
-                        <div className="h-px bg-[#00d1ff] mt-1"></div>
-                        <p className="text-sm opacity-70 mt-1 text-[#00d1ff] font-vt323">01 - 011101 &lt; // Character Create password</p>
-                        </div>
-                    </div>
-                    <div className="flex justify-between items-center mt-4">
-                        <button type="button" onClick={onCancel} className="text-2xl hover:text-white transition-colors duration-300 text-[#00d1ff] font-orbitron">&lt; Cancel</button>
-                        <p className={`text-sm h-4 font-orbitron ${error.includes('GRANTED') ? 'text-green-400' : 'text-red-500'}`}>{error}</p>
-                        <button type="submit" className="text-2xl hover:text-white transition-colors duration-300 text-[#00d1ff] font-orbitron">O K &gt;</button>
-                    </div>
-                    </form>
-                </div>
-                </div>
-            );
-        };
-
-        // --- GALLERY SCREEN (UPDATED: No Memory Images, Clean Cyber Rain) ---
-        const GalleryScreen = ({ onEnterSystem }) => {
-            // No images state, purely aesthetic text and background
-            return (
-                <div className="screen active z-20 flex items-center justify-center h-screen w-full fixed inset-0 overflow-hidden">
-                    {/* BACKGROUND LIVE ANIMATION: CYBER RAIN */}
-                    <CyberRain />
-                    
-                    {/* Center Content */}
-                    <div className="relative z-50 flex flex-col items-center justify-center text-center bg-black/60 p-12 rounded-2xl border border-[#00d1ff]/50 backdrop-blur-md shadow-[0_0_50px_rgba(0,209,255,0.3)] animate-screen-in">
-                        <h2 className="text-4xl md:text-6xl text-white font-orbitron mb-6" style={{ textShadow: '0 0 20px #00d1ff' }}>
-                            Congratulations!!
-                        </h2>
-                        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#00d1ff] to-transparent mb-6"></div>
-                        <p className="text-[#00d1ff] font-vt323 text-xl md:text-2xl mb-8 tracking-wider">
-                            ACCESS GRANTED. WELCOME TO THE NEURAL CORE.
-                        </p>
-                        <button 
-                            onClick={onEnterSystem}
-                            className="start-button font-orbitron flex items-center justify-center text-lg px-8 py-4 hover:scale-105 hover:shadow-[0_0_30px_#00d1ff] transition-all duration-300"
-                            style={{ width: 'auto', height: 'auto', borderRadius: '4px', border: '1px solid #00d1ff', background: 'rgba(0, 209, 255, 0.1)', color: '#fff' }}
-                        >
-                            OPEN EIZVALL
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
-        // Dashboard Component
-        const Dashboard = ({ selectedFile, previewUrl, isAnalyzing, results, scanProgress, onFileChange, onReset, onAnalyze }) => {
-            return (
-                <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-indigo-500 selection:text-white overflow-x-hidden relative animate-fade-in z-50">
-                {/* Background Dashboard */}
-                <div className="fixed inset-0 z-0 pointer-events-none">
-                    <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse"></div>
-                    <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-violet-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-                    <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] bg-blue-500/10 rounded-full blur-[100px]"></div>
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-                </div>
-
-                <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl flex flex-col min-h-screen">
-                    <header className="flex justify-between items-center mb-12">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                        <Cpu className="text-white w-6 h-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 font-orbitron">
-                        EizVall<span className="text-indigo-400">4Ever</span>
-                        </h1>
-                    </div>
-                    <nav className="hidden md:flex gap-6 text-sm font-medium text-slate-400 font-orbitron">
-                        <span className="hover:text-white transition-colors cursor-pointer">System Logs</span>
-                        <span className="hover:text-white transition-colors cursor-pointer">Neural Net</span>
-                        <button className="px-4 py-2 rounded-full border border-slate-700 hover:bg-slate-800 transition-all text-white text-xs">
-                        v2.4 Beta
-                        </button>
-                    </nav>
-                    </header>
-
-                    <main className="flex-grow flex flex-col items-center justify-center w-full">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 w-full items-start">
-                        <div className="flex flex-col gap-6 animate-fade-in-up">
-                        <div className="space-y-2">
-                            <h2 className="text-4xl md:text-5xl font-bold leading-tight font-orbitron">
-                            Klasifikasi Gambar <br />
-                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                                Next-Gen AI Core
-                            </span>
-                            </h2>
-                            <p className="text-slate-400 text-lg max-w-md">
-                            Unggah gambar apa saja, dan biarkan jaringan saraf tiruan kami menganalisis pola, objek, dan konteks dalam hitungan detik.
-                            </p>
-                        </div>
-
-                        {!selectedFile ? (
-                            <div className="mt-4 group relative w-full aspect-[4/3] rounded-3xl border-2 border-dashed border-slate-700 bg-slate-900/50 hover:bg-slate-800/50 hover:border-indigo-500/50 transition-all duration-300 flex flex-col items-center justify-center overflow-hidden cursor-pointer backdrop-blur-sm">
-                            <input type="file" accept="image/*" onChange={onFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                            <div className="z-10 flex flex-col items-center gap-4 p-6 text-center transition-transform group-hover:scale-105 duration-300">
-                                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 group-hover:shadow-lg group-hover:shadow-indigo-500/50 transition-all duration-300">
-                                <Upload className="w-8 h-8 text-slate-300 group-hover:text-white" />
-                                </div>
-                                <div>
-                                <p className="text-lg font-semibold text-white font-orbitron">Klik atau Seret Gambar</p>
-                                <p className="text-slate-400 text-sm">Mendukung JPG, PNG, WEBP</p>
-                                </div>
-                            </div>
-                            </div>
-                        ) : (
-                            <div className="mt-4 relative w-full aspect-[4/3] bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl group">
-                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                            {isAnalyzing && (
-                                <div className="absolute inset-0 z-20 pointer-events-none">
-                                <div className="w-full h-1 bg-indigo-400 shadow-[0_0_15px_3px_rgba(99,102,241,0.8)] absolute top-0 left-0 animate-scan" style={{ animationDuration: '1.5s', animationIterationCount: 'infinite' }}></div>
-                                <div className="absolute inset-0 bg-indigo-500/10 mix-blend-overlay"></div>
-                                <div className="absolute top-4 right-4 font-mono text-xs text-indigo-300 bg-black/60 px-2 py-1 rounded backdrop-blur-md border border-indigo-500/30">PROCESSING... {Math.round(scanProgress)}%</div>
-                                </div>
-                            )}
-                            {!isAnalyzing && (
-                                <button onClick={onReset} className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-red-500/80 text-white rounded-full backdrop-blur-md transition-all border border-white/10 z-30"><X className="w-5 h-5" /></button>
-                            )}
-                            </div>
-                        )}
-
-                        {selectedFile && !results && !isAnalyzing && (
-                            <button onClick={onAnalyze} className="w-full py-4 bg-white text-slate-950 rounded-2xl font-bold text-lg hover:bg-indigo-50 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.5)] flex items-center justify-center gap-2 font-orbitron tracking-wider">
-                            <Scan className="w-5 h-5" /> START ANALYSIS
-                            </button>
-                        )}
-                        </div>
-
-                        <div className="flex flex-col justify-center h-full">
-                        {isAnalyzing ? (
-                            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl flex flex-col items-center justify-center min-h-[400px] text-center space-y-6">
-                            <div className="relative">
-                                <div className="w-20 h-20 rounded-full border-4 border-slate-700 border-t-indigo-500 animate-spin"></div>
-                                <div className="absolute inset-0 flex items-center justify-center"><Zap className="w-8 h-8 text-indigo-400 animate-pulse" /></div>
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="text-xl font-semibold text-white font-orbitron">ANALYZING PATTERNS...</h3>
-                                <p className="text-slate-400 text-sm">Extracting visual features via Neural Network.</p>
-                            </div>
-                            <div className="w-full max-w-xs bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-200 ease-out" style={{ width: `${scanProgress}%` }}></div>
-                            </div>
-                            </div>
-                        ) : results ? (
-                            <div className="bg-slate-900/60 border border-slate-700/50 rounded-3xl p-8 backdrop-blur-xl animate-fade-in-right shadow-2xl shadow-black/50">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-bold flex items-center gap-2 font-orbitron"><BarChart3 className="text-indigo-400" /> ANALYSIS RESULTS</h3>
-                                <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-full border border-green-500/30 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> COMPLETED</span>
-                            </div>
-                            <div className="space-y-6">
-                                {results.map((item, index) => (
-                                <div key={index} className="group">
-                                    <div className="flex justify-between text-sm mb-2">
-                                    <span className={`font-medium ${index === 0 ? 'text-white text-lg' : 'text-slate-300'}`}>{item.label}</span>
-                                    <span className="font-mono text-slate-400">{item.confidence}%</span>
-                                    </div>
-                                    <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden p-0.5">
-                                    <div className={`h-full rounded-full transition-all duration-1000 ease-out ${index === 0 ? 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-slate-600'}`} style={{ width: `${item.confidence}%`, transitionDelay: `${index * 100}ms` }}></div>
-                                    </div>
-                                </div>
-                                ))}
-                            </div>
-                            <div className="mt-8 pt-6 border-t border-slate-700/50">
-                                <button onClick={onReset} className="w-full mt-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors border border-slate-600 font-orbitron tracking-wide">NEW ANALYSIS</button>
-                            </div>
-                            </div>
-                        ) : (
-                            <div className="hidden lg:flex flex-col justify-center items-start space-y-8 opacity-50">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 bg-slate-800 rounded-2xl"><ImageIcon className="w-6 h-6 text-slate-400" /></div>
-                                <div><h4 className="text-white font-semibold">Upload</h4><p className="text-sm text-slate-400 max-w-xs">Mendukung format standar industri.</p></div>
-                            </div>
-                            <div className="w-0.5 h-12 bg-slate-800 ml-6"></div>
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 bg-slate-800 rounded-2xl"><Cpu className="w-6 h-6 text-slate-400" /></div>
-                                <div><h4 className="text-white font-semibold">Proses Neural</h4><p className="text-sm text-slate-400 max-w-xs">Analisis multi-layer deep learning.</p></div>
-                            </div>
-                            <div className="w-0.5 h-12 bg-slate-800 ml-6"></div>
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 bg-slate-800 rounded-2xl"><BarChart3 className="w-6 h-6 text-slate-400" /></div>
-                                <div><h4 className="text-white font-semibold">Hasil Akurat</h4><p className="text-sm text-slate-400 max-w-xs">Probabilitas kelas dengan presisi tinggi.</p></div>
-                            </div>
-                            </div>
-                        )}
-                        </div>
-                    </div>
-                    </main>
-                </div>
-                </div>
-            );
-        };
-
-        // --- STYLES ---
-        const GlobalStyles = () => (
-            <style>{`
-                :root {
-                    --primary-color: #00d1ff;
-                    --glow-color: rgba(0, 209, 255, 0.7);
-                    --button-gold-start: #d4af37;
-                    --button-gold-end: #b8860b;
-                    --button-border-gold: #f0e68c;
-                }
-
-                .font-orbitron { font-family: 'Orbitron', sans-serif; }
-                .font-vt323 { font-family: 'VT323', monospace; }
-
-                .start-button {
-                    width: 120px; height: 120px; border-radius: 50%;
-                    background: radial-gradient(ellipse at center, var(--button-gold-start) 0%, var(--button-gold-end) 100%);
-                    border: 2px solid var(--button-border-gold); color: #1a1a1a;
-                    font-weight: bold; letter-spacing: 2px;
-                    cursor: pointer; transition: all 0.3s ease;
-                    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-                }
-                .start-button:hover { transform: scale(1.05); box-shadow: 0 0 25px rgba(255, 215, 0, 0.8); }
-
-                @keyframes blink {
-                    from, to { border-right-color: transparent; }
-                    50% { border-right-color: var(--primary-color); }
-                }
-                @keyframes zoomOut {
-                    from { transform: scale(1); opacity: 1; }
-                    to { transform: scale(0.95); opacity: 0; }
-                }
-                @keyframes zoomIn {
-                    from { transform: scale(1.05); opacity: 0; }
-                    to { transform: scale(1); opacity: 1; }
-                }
-                @keyframes popIn {
-                    0% { transform: scale(0); }
-                    70% { transform: scale(1.1); }
-                    100% { transform: scale(1); }
-                }
-
-                .animate-screen-in { animation: zoomIn 0.5s ease-in-out forwards; }
-                .animate-screen-out { animation: zoomOut 0.5s ease-in-out forwards; }
-                .animate-pop-in { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-                .animate-fade-in-up { animation: fade-in-up 0.8s ease-out forwards; }
-                .animate-bounce-slow { animation: bounce 3s infinite; }
-                
-                @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
-                .animate-scan { animation: scan 2s linear infinite; }
-                @keyframes fade-in-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes fade-in-right { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-                .animate-fade-in-right { animation: fade-in-right 0.6s ease-out forwards; }
-                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-                .animate-fade-in { animation: fade-in 1.5s ease-out forwards; }
-            `}</style>
-        );
-
-        // --- RENDER REACT APP ---
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-
+      init();
     </script>
-</body>
+  </body>
 </html>
