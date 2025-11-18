@@ -7,7 +7,13 @@
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
-    MODEL_PATH: './tfjs_models/model.json',
+    MODEL_PATH: 'tfjs_models/model.json',
+    MODEL_PATH_FALLBACKS: [
+        'tfjs_models/model.json',
+        './tfjs_models/model.json',
+        '/Valll-vegetable-classifier-web/tfjs_models/model.json',
+        'https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/tfjs_models/model.json'
+    ],
     IMAGE_SIZE: 128,
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
     CLASS_LABELS: [
@@ -129,54 +135,76 @@ function preventDefaults(e) {
 
 // ==================== MODEL LOADING ====================
 /**
- * Load TensorFlow.js model
+ * Load TensorFlow.js model with fallback paths
  */
 async function loadModel() {
-    try {
-        showLoading('Memuat model AI...');
-        updateModelStatus('loading', 'Memuat model...');
+    showLoading('Memuat model AI...');
+    updateModelStatus('loading', 'Memuat model...');
+    
+    // Try multiple paths
+    for (let i = 0; i < CONFIG.MODEL_PATH_FALLBACKS.length; i++) {
+        const modelPath = CONFIG.MODEL_PATH_FALLBACKS[i];
         
-        console.log('📦 Loading model from:', CONFIG.MODEL_PATH);
-        console.log('📦 Full URL:', window.location.origin + '/' + CONFIG.MODEL_PATH);
-        
-        // Load the model with error handling
-        model = await tf.loadLayersModel(CONFIG.MODEL_PATH);
-        
-        console.log('✅ Model loaded successfully');
-        console.log('📊 Model input shape:', model.inputs[0].shape);
-        console.log('📊 Model output shape:', model.outputs[0].shape);
-        
-        // Warm up the model
-        console.log('🔥 Warming up model...');
-        const dummyInput = tf.zeros([1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE, 3]);
-        const warmupPrediction = model.predict(dummyInput);
-        warmupPrediction.dispose();
-        dummyInput.dispose();
-        
-        console.log('✅ Model warmed up and ready');
-        
-        isModelLoaded = true;
-        hideLoading();
-        updateModelStatus('ready', 'Model siap digunakan ✓');
-        
-    } catch (error) {
-        console.error('❌ Error loading model:', error);
-        console.error('❌ Error details:', {
-            message: error.message,
-            path: CONFIG.MODEL_PATH,
-            currentURL: window.location.href
-        });
-        hideLoading();
-        updateModelStatus('error', 'Gagal memuat model');
-        
-        // Show detailed error to user
-        let errorMsg = 'Gagal memuat model AI. ';
-        if (error.message.includes('404') || error.message.includes('fetch')) {
-            errorMsg += 'File model tidak ditemukan. Pastikan folder tfjs_models/ berisi model.json dan file .bin';
-        } else {
-            errorMsg += 'Error: ' + error.message;
+        try {
+            console.log(`📦 Trying to load model from (attempt ${i + 1}/${CONFIG.MODEL_PATH_FALLBACKS.length}):`, modelPath);
+            
+            // Try to fetch the model.json first to check if it exists
+            const response = await fetch(modelPath);
+            if (!response.ok) {
+                console.warn(`⚠️ Model not found at ${modelPath}, status: ${response.status}`);
+                continue;
+            }
+            
+            console.log('✓ Model file found, loading...');
+            
+            // Load the model
+            model = await tf.loadLayersModel(modelPath);
+            
+            console.log('✅ Model loaded successfully from:', modelPath);
+            console.log('📊 Model input shape:', model.inputs[0].shape);
+            console.log('📊 Model output shape:', model.outputs[0].shape);
+            
+            // Warm up the model
+            console.log('🔥 Warming up model...');
+            const dummyInput = tf.zeros([1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE, 3]);
+            const warmupPrediction = model.predict(dummyInput);
+            warmupPrediction.dispose();
+            dummyInput.dispose();
+            
+            console.log('✅ Model warmed up and ready');
+            
+            isModelLoaded = true;
+            hideLoading();
+            updateModelStatus('ready', 'Model siap digunakan ✓');
+            
+            return; // Success! Exit the function
+            
+        } catch (error) {
+            console.error(`❌ Error loading model from ${modelPath}:`, error.message);
+            
+            // If this is the last attempt, show error
+            if (i === CONFIG.MODEL_PATH_FALLBACKS.length - 1) {
+                console.error('❌ All model loading attempts failed');
+                console.error('❌ Full error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    currentURL: window.location.href,
+                    triedPaths: CONFIG.MODEL_PATH_FALLBACKS
+                });
+                
+                hideLoading();
+                updateModelStatus('error', 'Gagal memuat model');
+                
+                let errorMsg = '❌ Gagal memuat model AI setelah mencoba semua path.\n\n';
+                errorMsg += 'Kemungkinan penyebab:\n';
+                errorMsg += '1. File model belum selesai di-deploy ke GitHub Pages\n';
+                errorMsg += '2. Path folder tidak sesuai\n';
+                errorMsg += '3. File .bin terlalu besar atau corrupt\n\n';
+                errorMsg += 'Silakan tunggu beberapa menit dan refresh halaman (Ctrl+F5)';
+                
+                showError(errorMsg);
+            }
         }
-        showError(errorMsg);
     }
 }
 
