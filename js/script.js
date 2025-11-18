@@ -7,7 +7,7 @@
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
-    MODEL_PATH: 'tfjs_models/model.json',
+    MODEL_PATH: './tfjs_models/model.json',
     IMAGE_SIZE: 128,
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
     CLASS_LABELS: [
@@ -137,8 +137,9 @@ async function loadModel() {
         updateModelStatus('loading', 'Memuat model...');
         
         console.log('📦 Loading model from:', CONFIG.MODEL_PATH);
+        console.log('📦 Full URL:', window.location.origin + '/' + CONFIG.MODEL_PATH);
         
-        // Load the model
+        // Load the model with error handling
         model = await tf.loadLayersModel(CONFIG.MODEL_PATH);
         
         console.log('✅ Model loaded successfully');
@@ -152,7 +153,7 @@ async function loadModel() {
         warmupPrediction.dispose();
         dummyInput.dispose();
         
-        console.log('✅ Model warmed up');
+        console.log('✅ Model warmed up and ready');
         
         isModelLoaded = true;
         hideLoading();
@@ -160,9 +161,22 @@ async function loadModel() {
         
     } catch (error) {
         console.error('❌ Error loading model:', error);
+        console.error('❌ Error details:', {
+            message: error.message,
+            path: CONFIG.MODEL_PATH,
+            currentURL: window.location.href
+        });
         hideLoading();
         updateModelStatus('error', 'Gagal memuat model');
-        showError('Gagal memuat model AI. Pastikan file model tersedia di folder tfjs_models/');
+        
+        // Show detailed error to user
+        let errorMsg = 'Gagal memuat model AI. ';
+        if (error.message.includes('404') || error.message.includes('fetch')) {
+            errorMsg += 'File model tidak ditemukan. Pastikan folder tfjs_models/ berisi model.json dan file .bin';
+        } else {
+            errorMsg += 'Error: ' + error.message;
+        }
+        showError(errorMsg);
     }
 }
 
