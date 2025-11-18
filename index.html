@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klasifikasi Gambar Sayuran AI - Neural Network Classifier</title>
+    
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .header-glow {
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        
+        .upload-area {
+            border: 3px dashed #cbd5e0;
+            border-radius: 1.5rem;
+            padding: 4rem 2rem;
+            text-align: center;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s ease;
+        }
+        
+        .upload-area:hover::before {
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+            transform: scale(1.01);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #edf2f7;
+            transform: scale(1.02);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 450px;
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .result-card {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            animation: slideUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2.5rem;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+            color: #2d3748;
+            padding: 1rem 2.5rem;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #cbd5e0 0%, #a0aec0 100%);
+            transform: translateY(-2px);
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .confidence-bar {
+            height: 28px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 6px;
+            transition: width 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .vegetable-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .card-main {
+            background: white;
+            border-radius: 2rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            padding: 2.5rem;
+        }
+        
+        .prediction-item {
+            transition: all 0.3s ease;
+        }
+        
+        .prediction-item:hover {
+            transform: translateX(5px);
+        }
+        
+        .main-result-container {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            border: 3px solid transparent;
+            background-clip: padding-box;
+            position: relative;
+        }
+        
+        .main-result-container::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 1.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            z-index: -1;
+        }
+        
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .8; }
+        }
+        
+        .info-badge {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem 0.5rem;
+            }
+            
+            .card-main {
+                padding: 1.5rem;
+            }
+            
+            .btn-primary, .btn-secondary {
+                padding: 0.75rem 1.5rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <h1 class="text-5xl md:text-6xl font-bold text-white mb-4 header-glow">
+                🥬 Klasifikasi Sayuran AI
+            </h1>
+            <p class="text-xl md:text-2xl text-white opacity-90 mb-3">
+                Powered by TensorFlow.js Neural Network
+            </p>
+            <div class="info-badge inline-block">
+                <p class="text-white font-semibold">✨ Upload gambar sayuran untuk identifikasi otomatis</p>
+            </div>
+        </div>
+        
+        <!-- Main Card -->
+        <div class="card-main mb-8">
+            <!-- Upload Area -->
+            <div id="uploadArea" class="upload-area mb-6">
+                <input type="file" id="fileInput" accept="image/*" class="hidden">
+                <div id="uploadContent" class="relative z-10">
+                    <div class="vegetable-icon">📸</div>
+                    <p class="text-3xl font-bold text-gray-800 mb-3">Klik atau Drag & Drop</p>
+                    <p class="text-lg text-gray-600 mb-6">untuk upload gambar sayuran (JPG, PNG)</p>
+                    <button class="btn-primary" onclick="document.getElementById('fileInput').click()">
+                        📂 Pilih Gambar
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Loading Status -->
+            <div id="loadingStatus" class="text-center mb-6 hidden">
+                <div class="spinner mb-4"></div>
+                <p class="text-gray-700 font-semibold text-lg" id="loadingText">Memuat model AI...</p>
+                <p class="text-gray-500 text-sm mt-2">Mohon tunggu sebentar</p>
+            </div>
+            
+            <!-- Image Preview -->
+            <div id="previewSection" class="hidden text-center mb-6">
+                <div class="mb-6">
+                    <img id="previewImage" class="preview-image mx-auto" alt="Preview">
+                </div>
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <button class="btn-primary" id="analyzeBtn" onclick="classifyImage()">
+                        🔍 Analisis Gambar
+                    </button>
+                    <button class="btn-secondary" onclick="resetUpload()">
+                        🔄 Upload Ulang
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Results -->
+            <div id="resultsSection" class="hidden">
+                <div class="result-card">
+                    <h2 class="text-4xl font-bold text-center mb-8 text-gray-800">
+                        🎯 Hasil Klasifikasi
+                    </h2>
+                    
+                    <!-- Main Prediction -->
+                    <div class="main-result-container text-center mb-10">
+                        <div class="text-7xl mb-4 pulse" id="resultIcon">🥬</div>
+                        <h3 class="text-5xl font-extrabold text-gray-900 mb-3" id="resultClass">-</h3>
+                        <div class="flex items-center justify-center gap-2 text-2xl">
+                            <span class="text-gray-600">Confidence:</span>
+                            <span id="resultConfidence" class="font-bold text-purple-600">0%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Top 5 Predictions -->
+                    <div class="mb-6">
+                        <h4 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                            <span class="mr-2">📊</span> Top 5 Prediksi Teratas:
+                        </h4>
+                        <div id="top5Predictions" class="space-y-4">
+                            <!-- Will be filled by JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-8">
+                        <button class="btn-primary" onclick="resetUpload()">
+                            ✨ Analisis Gambar Lain
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer Info -->
+        <div class="text-center text-white">
+            <div class="info-badge inline-block mb-4">
+                <p class="font-semibold text-lg mb-2">🧠 Model AI dilatih untuk mengenali 15 jenis sayuran:</p>
+                <p class="text-sm opacity-90">
+                    Bean • Bitter Gourd • Bottle Gourd • Brinjal • Broccoli • Cabbage • 
+                    Capsicum • Carrot • Cauliflower • Cucumber • Papaya • 
+                    Potato • Pumpkin • Radish • Tomato
+                </p>
+            </div>
+            <p class="text-sm opacity-75 mt-4">
+                © 2025 Vegetable AI Classifier | Powered by TensorFlow.js
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let model = null;
+        let isModelLoaded = false;
+        
+        // Class labels (sesuai dengan label.txt dari model)
+        const classLabels = [
+            'Bean', 'Bitter_Gourd', 'Bottle_Gourd', 'Brinjal', 'Broccoli',
+            'Cabbage', 'Capsicum', 'Carrot', 'Cauliflower', 'Cucumber',
+            'Papaya', 'Potato', 'Pumpkin', 'Radish', 'Tomato'
+        ];
+        
+        // Vegetable icons mapping untuk tampilan visual
+        const vegetableIcons = {
+            'Bean': '🫘',
+            'Bitter_Gourd': '🥒',
+            'Bottle_Gourd': '🍈',
+            'Brinjal': '🍆',
+            'Broccoli': '🥦',
+            'Cabbage': '🥬',
+            'Capsicum': '🫑',
+            'Carrot': '🥕',
+            'Cauliflower': '🥦',
+            'Cucumber': '🥒',
+            'Papaya': '🍈',
+            'Potato': '🥔',
+            'Pumpkin': '🎃',
+            'Radish': '🌰',
+            'Tomato': '🍅'
+        };
+        
+        // Load model saat halaman dimuat
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadModel();
+        });
+        
+        // Fungsi untuk load TensorFlow.js model
+        async function loadModel() {
+            try {
+                document.getElementById('loadingStatus').classList.remove('hidden');
+                document.getElementById('loadingText').textContent = 'Memuat model AI...';
+                
+                // Load model dari folder tfjs_models
+                model = await tf.loadLayersModel('tfjs_models/model.json');
+                
+                isModelLoaded = true;
+                document.getElementById('loadingStatus').classList.add('hidden');
+                console.log('✅ Model berhasil dimuat!');
+                
+                // Warm up model dengan dummy prediction
+                const dummyInput = tf.zeros([1, 128, 128, 3]);
+                model.predict(dummyInput).dispose();
+                dummyInput.dispose();
+                console.log('✅ Model warmed up!');
+                
+            } catch (error) {
+                console.error('❌ Error loading model:', error);
+                document.getElementById('loadingText').textContent = 'Gagal memuat model. Pastikan folder tfjs_models tersedia.';
+                document.getElementById('loadingText').classList.add('text-red-600');
+            }
+        }
+        
+        // File input change handler
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+        
+        // Drag and drop handlers
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files && files[0] && files[0].type.startsWith('image/')) {
+                handleFileSelect(files[0]);
+            } else {
+                alert('❌ Mohon upload file gambar (JPG, PNG)');
+            }
+        });
+        
+        uploadArea.addEventListener('click', (e) => {
+            // Hanya trigger jika bukan dari tombol
+            if (!e.target.closest('button')) {
+                document.getElementById('fileInput').click();
+            }
+        });
+        
+        // Handle file selection
+        function handleFileSelect(file) {
+            if (!file) return;
+            
+            // Validasi ukuran file (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('❌ Ukuran file terlalu besar. Maksimal 10MB.');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImage').src = e.target.result;
+                document.getElementById('uploadArea').classList.add('hidden');
+                document.getElementById('previewSection').classList.remove('hidden');
+                document.getElementById('resultsSection').classList.add('hidden');
+            };
+            reader.onerror = function() {
+                alert('❌ Gagal membaca file. Silakan coba lagi.');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Reset upload
+        function resetUpload() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadArea').classList.remove('hidden');
+            document.getElementById('previewSection').classList.add('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+        }
+        
+        // Classify image
+        async function classifyImage() {
+            if (!isModelLoaded) {
+                alert('⏳ Model belum selesai dimuat. Mohon tunggu sebentar...');
+                return;
+            }
+            
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '⏳ Menganalisis...';
+            analyzeBtn.classList.add('pulse');
+            
+            try {
+                // Get image element
+                const imgElement = document.getElementById('previewImage');
+                
+                // Tunggu gambar benar-benar loaded
+                if (!imgElement.complete) {
+                    await new Promise((resolve) => {
+                        imgElement.onload = resolve;
+                    });
+                }
+                
+                // Preprocess image
+                let tensor = tf.browser.fromPixels(imgElement)
+                    .resizeNearestNeighbor([128, 128]) // Resize to 128x128 sesuai input model
+                    .toFloat()
+                    .div(tf.scalar(255.0)) // Normalize to [0, 1]
+                    .expandDims(); // Add batch dimension [1, 128, 128, 3]
+                
+                console.log('🔍 Input tensor shape:', tensor.shape);
+                
+                // Make prediction
+                const predictions = await model.predict(tensor).data();
+                
+                console.log('📊 Predictions:', predictions);
+                
+                // Clean up tensor
+                tensor.dispose();
+                
+                // Get top 5 predictions
+                const top5 = getTop5Predictions(predictions);
+                
+                // Display results
+                displayResults(top5);
+                
+            } catch (error) {
+                console.error('❌ Error during classification:', error);
+                alert('❌ Terjadi kesalahan saat mengklasifikasi gambar. Silakan coba lagi.');
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔍 Analisis Gambar';
+                analyzeBtn.classList.remove('pulse');
+            }
+        }
+        
+        // Get top 5 predictions
+        function getTop5Predictions(predictions) {
+            const predArray = Array.from(predictions);
+            const indexed = predArray.map((prob, index) => ({
+                class: classLabels[index],
+                probability: prob
+            }));
+            
+            // Sort by probability descending
+            indexed.sort((a, b) => b.probability - a.probability);
+            
+            return indexed.slice(0, 5);
+        }
+        
+        // Display results
+        function displayResults(top5) {
+            // Show results section
+            document.getElementById('resultsSection').classList.remove('hidden');
+            
+            // Display main result
+            const topResult = top5[0];
+            const displayName = topResult.class.replace(/_/g, ' ');
+            
+            document.getElementById('resultIcon').textContent = vegetableIcons[topResult.class] || '🥬';
+            document.getElementById('resultClass').textContent = displayName;
+            document.getElementById('resultConfidence').textContent = (topResult.probability * 100).toFixed(2) + '%';
+            
+            // Display top 5
+            const top5Container = document.getElementById('top5Predictions');
+            top5Container.innerHTML = '';
+            
+            top5.forEach((pred, index) => {
+                const percentage = (pred.probability * 100).toFixed(2);
+                const barWidth = Math.max(percentage, 2); // Minimal 2% untuk visibility
+                const displayName = pred.class.replace(/_/g, ' ');
+                
+                const predElement = document.createElement('div');
+                predElement.className = 'prediction-item';
+                predElement.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl">${vegetableIcons[pred.class] || '🥬'}</span>
+                            <span class="font-bold text-gray-800 text-lg">${displayName}</span>
+                        </div>
+                        <span class="text-lg font-bold text-purple-600">${percentage}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-7 overflow-hidden">
+                        <div class="confidence-bar h-full flex items-center justify-end pr-3 text-white text-sm font-bold" 
+                             style="width: ${barWidth}%">
+                        </div>
+                    </div>
+                `;
+                
+                top5Container.appendChild(predElement);
+            });
+            
+            // Scroll to results smoothly
+            setTimeout(() => {
+                document.getElementById('resultsSection').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                });
+            }, 100);
+        }
+        
+        // Console log untuk debugging
+        console.log('🚀 Vegetable AI Classifier initialized');
+        console.log('📋 Class labels:', classLabels);
+    </script>
+</body>
+</html>

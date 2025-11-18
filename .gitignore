@@ -1,0 +1,27 @@
+# Node modules (if any)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Python (if any preprocessing scripts)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
