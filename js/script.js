@@ -1,38 +1,20 @@
 /**
  * ========================================
  * VEGETABLE AI CLASSIFIER - JAVASCRIPT
- * TensorFlow.js-based Image Classification
+ * API-based Image Classification
  * ========================================
  */
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
-    MODEL_PATH: 'tfjs_models/model.json',
-    MODEL_PATH_FALLBACKS: [
-        'tfjs_models/model.json',
-        './tfjs_models/model.json',
-        '/Valll-vegetable-classifier-web/tfjs_models/model.json',
-        'https://rivaldy-25-lval.github.io/Valll-vegetable-classifier-web/tfjs_models/model.json'
-    ],
-    IMAGE_SIZE: 128,
+    // API Configuration - UPDATE THIS AFTER DEPLOYING BACKEND
+    API_URL: 'https://vegetable-classifier-api.onrender.com',
+    
+    // Local development fallback
+    API_FALLBACK: 'http://localhost:5000',
+    
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-    CLASS_LABELS: [
-        'Bean',
-        'Bitter_Gourd',
-        'Bottle_Gourd',
-        'Brinjal',
-        'Broccoli',
-        'Cabbage',
-        'Capsicum',
-        'Carrot',
-        'Cauliflower',
-        'Cucumber',
-        'Papaya',
-        'Potato',
-        'Pumpkin',
-        'Radish',
-        'Tomato'
-    ],
+    
     VEGETABLE_EMOJIS: {
         'Bean': '🫘',
         'Bitter_Gourd': '🥒',
@@ -53,8 +35,8 @@ const CONFIG = {
 };
 
 // ==================== GLOBAL STATE ====================
-let model = null;
-let isModelLoaded = false;
+let currentImageFile = null;
+let isApiReady = false;
 
 // ==================== DOM ELEMENTS ====================
 const DOM = {
@@ -88,13 +70,13 @@ const DOM = {
  * Initialize the application
  */
 async function initApp() {
-    console.log('🚀 Initializing Vegetable AI Classifier...');
+    console.log('🚀 Initializing Vegetable AI Classifier (API Mode)...');
     
     // Setup event listeners
     setupEventListeners();
     
-    // Load TensorFlow.js model
-    await loadModel();
+    // Check API health
+    await checkApiHealth();
     
     console.log('✅ Application initialized successfully');
 }
@@ -133,78 +115,93 @@ function preventDefaults(e) {
     e.stopPropagation();
 }
 
-// ==================== MODEL LOADING ====================
+// ==================== API FUNCTIONS ====================
 /**
- * Load TensorFlow.js model with fallback paths
+ * Check if API is healthy
  */
-async function loadModel() {
-    showLoading('Memuat model AI...');
-    updateModelStatus('loading', 'Memuat model...');
-    
-    // Try multiple paths
-    for (let i = 0; i < CONFIG.MODEL_PATH_FALLBACKS.length; i++) {
-        const modelPath = CONFIG.MODEL_PATH_FALLBACKS[i];
+async function checkApiHealth() {
+    try {
+        showLoading('Memeriksa koneksi API...');
+        updateModelStatus('loading', 'Menghubungi server...');
         
-        try {
-            console.log(`📦 Trying to load model from (attempt ${i + 1}/${CONFIG.MODEL_PATH_FALLBACKS.length}):`, modelPath);
-            
-            // Try to fetch the model.json first to check if it exists
-            const response = await fetch(modelPath);
-            if (!response.ok) {
-                console.warn(`⚠️ Model not found at ${modelPath}, status: ${response.status}`);
-                continue;
+        console.log('📡 Checking API health at:', CONFIG.API_URL);
+        
+        const response = await fetch(`${CONFIG.API_URL}/health`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
             }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ API is healthy:', data);
             
-            console.log('✓ Model file found, loading...');
-            
-            // Load the model
-            model = await tf.loadLayersModel(modelPath);
-            
-            console.log('✅ Model loaded successfully from:', modelPath);
-            console.log('📊 Model input shape:', model.inputs[0].shape);
-            console.log('📊 Model output shape:', model.outputs[0].shape);
-            
-            // Warm up the model
-            console.log('🔥 Warming up model...');
-            const dummyInput = tf.zeros([1, CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE, 3]);
-            const warmupPrediction = model.predict(dummyInput);
-            warmupPrediction.dispose();
-            dummyInput.dispose();
-            
-            console.log('✅ Model warmed up and ready');
-            
-            isModelLoaded = true;
+            isApiReady = data.model_loaded;
             hideLoading();
-            updateModelStatus('ready', 'Model siap digunakan ✓');
             
-            return; // Success! Exit the function
-            
-        } catch (error) {
-            console.error(`❌ Error loading model from ${modelPath}:`, error.message);
-            
-            // If this is the last attempt, show error
-            if (i === CONFIG.MODEL_PATH_FALLBACKS.length - 1) {
-                console.error('❌ All model loading attempts failed');
-                console.error('❌ Full error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    currentURL: window.location.href,
-                    triedPaths: CONFIG.MODEL_PATH_FALLBACKS
-                });
-                
-                hideLoading();
-                updateModelStatus('error', 'Gagal memuat model');
-                
-                let errorMsg = '❌ Gagal memuat model AI setelah mencoba semua path.\n\n';
-                errorMsg += 'Kemungkinan penyebab:\n';
-                errorMsg += '1. File model belum selesai di-deploy ke GitHub Pages\n';
-                errorMsg += '2. Path folder tidak sesuai\n';
-                errorMsg += '3. File .bin terlalu besar atau corrupt\n\n';
-                errorMsg += 'Silakan tunggu beberapa menit dan refresh halaman (Ctrl+F5)';
-                
-                showError(errorMsg);
+            if (isApiReady) {
+                updateModelStatus('ready', 'API siap digunakan ✓');
+            } else {
+                updateModelStatus('loading', 'Server sedang memuat model...');
+                // Retry after 3 seconds
+                setTimeout(checkApiHealth, 3000);
             }
+        } else {
+            throw new Error(`API returned status ${response.status}`);
         }
+        
+    } catch (error) {
+        console.error('❌ API health check failed:', error);
+        hideLoading();
+        updateModelStatus('error', 'Server tidak tersedia');
+        
+        showError(
+            'Tidak dapat terhubung ke server API.\n\n' +
+            'Kemungkinan penyebab:\n' +
+            '1. Server masih dalam proses startup (tunggu 1-2 menit)\n' +
+            '2. Server sedang sleep (klik refresh setelah beberapa saat)\n' +
+            '3. Koneksi internet bermasalah\n\n' +
+            'Silakan refresh halaman (Ctrl+F5) setelah beberapa saat.'
+        );
+    }
+}
+
+/**
+ * Send image to API for prediction
+ */
+async function predictWithApi(imageFile) {
+    try {
+        console.log('📤 Sending image to API for prediction...');
+        
+        // Create FormData
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        
+        // Send request
+        const response = await fetch(`${CONFIG.API_URL}/predict`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error('Prediction failed');
+        }
+        
+        console.log('✅ Prediction successful:', data);
+        
+        return data.predictions;
+        
+    } catch (error) {
+        console.error('❌ API prediction error:', error);
+        throw error;
     }
 }
 
@@ -236,7 +233,7 @@ function handleDragLeave(event) {
 }
 
 /**
- * Handle file drop
+ * Handle drop
  */
 function handleDrop(event) {
     event.preventDefault();
@@ -249,266 +246,181 @@ function handleDrop(event) {
 }
 
 /**
- * Process uploaded file
+ * Process selected file
  */
 function processFile(file) {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-        showError('File harus berupa gambar (JPG, PNG, WebP)');
+        showError('File yang dipilih bukan gambar. Silakan pilih file gambar (JPG, PNG, dll)');
         return;
     }
     
     // Validate file size
     if (file.size > CONFIG.MAX_FILE_SIZE) {
-        showError('Ukuran file terlalu besar. Maksimal 10MB');
+        showError(`Ukuran file terlalu besar. Maksimal ${CONFIG.MAX_FILE_SIZE / (1024 * 1024)}MB`);
         return;
     }
     
-    // Read and display image
+    // Store file
+    currentImageFile = file;
+    
+    // Show preview
     const reader = new FileReader();
-    
-    reader.onload = function(e) {
+    reader.onload = (e) => {
         DOM.imagePreview.src = e.target.result;
-        DOM.uploadContent.classList.add('hidden');
-        DOM.previewContainer.classList.remove('hidden');
-        DOM.resultsSection.classList.add('hidden');
+        DOM.previewContainer.style.display = 'block';
+        DOM.uploadContent.style.display = 'none';
+        
+        // Hide results if any
+        DOM.resultsSection.style.display = 'none';
     };
-    
-    reader.onerror = function() {
-        showError('Gagal membaca file. Silakan coba lagi.');
-    };
-    
     reader.readAsDataURL(file);
+    
+    console.log('📷 Image loaded:', file.name, `(${(file.size / 1024).toFixed(2)} KB)`);
 }
 
 /**
- * Reset upload state
+ * Reset upload
  */
 function resetUpload() {
+    currentImageFile = null;
     DOM.fileInput.value = '';
-    DOM.imagePreview.src = '';
-    DOM.uploadContent.classList.remove('hidden');
-    DOM.previewContainer.classList.add('hidden');
-    DOM.resultsSection.classList.add('hidden');
-}
-
-// ==================== IMAGE PREPROCESSING ====================
-/**
- * Preprocess image for model input
- */
-async function preprocessImage(imageElement) {
-    return tf.tidy(() => {
-        // Convert image to tensor
-        let tensor = tf.browser.fromPixels(imageElement);
-        
-        // Resize to model input size
-        tensor = tf.image.resizeBilinear(tensor, [CONFIG.IMAGE_SIZE, CONFIG.IMAGE_SIZE]);
-        
-        // Normalize pixel values to [0, 1]
-        tensor = tensor.toFloat().div(255.0);
-        
-        // Add batch dimension
-        tensor = tensor.expandDims(0);
-        
-        console.log('📐 Preprocessed tensor shape:', tensor.shape);
-        
-        return tensor;
-    });
+    DOM.previewContainer.style.display = 'none';
+    DOM.uploadContent.style.display = 'flex';
+    DOM.resultsSection.style.display = 'none';
+    console.log('🔄 Upload reset');
 }
 
 // ==================== PREDICTION ====================
 /**
- * Handle image analysis
+ * Handle analyze button click
  */
 async function handleAnalyze() {
-    if (!isModelLoaded) {
-        showError('Model belum siap. Mohon tunggu sebentar...');
+    if (!currentImageFile) {
+        showError('Silakan pilih gambar terlebih dahulu');
         return;
     }
     
-    if (!DOM.imagePreview.src) {
-        showError('Tidak ada gambar untuk dianalisis');
+    if (!isApiReady) {
+        showError('Server belum siap. Mohon tunggu sebentar atau refresh halaman.');
         return;
     }
     
     try {
-        // Disable analyze button
+        // Disable button
         DOM.analyzeBtn.disabled = true;
-        DOM.analyzeBtn.innerHTML = '<span>⏳ Menganalisis...</span>';
+        DOM.analyzeBtn.style.opacity = '0.6';
         
+        // Show loading
         showLoading('Menganalisis gambar...');
         
-        // Wait for image to load
-        if (!DOM.imagePreview.complete) {
-            await new Promise((resolve) => {
-                DOM.imagePreview.onload = resolve;
-            });
-        }
+        // Call API
+        const predictions = await predictWithApi(currentImageFile);
         
-        console.log('🔍 Starting image analysis...');
-        
-        // Preprocess image
-        const inputTensor = await preprocessImage(DOM.imagePreview);
-        
-        // Run prediction
-        console.log('🧠 Running model prediction...');
-        const predictions = model.predict(inputTensor);
-        
-        // Get prediction data
-        const predictionData = await predictions.data();
-        console.log('📈 Raw predictions:', predictionData);
-        
-        // Clean up tensors
-        inputTensor.dispose();
-        predictions.dispose();
-        
-        // Process results
-        const results = processResults(predictionData);
-        console.log('✅ Processed results:', results);
+        // Hide loading
+        hideLoading();
         
         // Display results
-        displayResults(results);
+        displayResults(predictions);
         
-        hideLoading();
+        // Re-enable button
+        DOM.analyzeBtn.disabled = false;
+        DOM.analyzeBtn.style.opacity = '1';
         
     } catch (error) {
-        console.error('❌ Error during analysis:', error);
-        showError('Terjadi kesalahan saat menganalisis gambar. Silakan coba lagi.');
         hideLoading();
-        
-    } finally {
-        // Re-enable analyze button
         DOM.analyzeBtn.disabled = false;
-        DOM.analyzeBtn.innerHTML = '<span>🔍 Analisis Gambar</span>';
+        DOM.analyzeBtn.style.opacity = '1';
+        
+        showError(`Gagal menganalisis gambar: ${error.message}`);
     }
-}
-
-/**
- * Process prediction results
- */
-function processResults(predictionData) {
-    // Convert to array and map to labels
-    const predictions = Array.from(predictionData);
-    
-    // Create array of {label, probability} objects
-    const results = predictions.map((probability, index) => ({
-        label: CONFIG.CLASS_LABELS[index],
-        probability: probability,
-        percentage: (probability * 100).toFixed(2)
-    }));
-    
-    // Sort by probability (descending)
-    results.sort((a, b) => b.probability - a.probability);
-    
-    return results;
 }
 
 // ==================== RESULTS DISPLAY ====================
 /**
- * Display classification results
+ * Display prediction results
  */
-function displayResults(results) {
+function displayResults(predictions) {
+    if (!predictions || predictions.length === 0) {
+        showError('Tidak ada hasil prediksi');
+        return;
+    }
+    
     // Get top prediction
-    const topResult = results[0];
+    const topPrediction = predictions[0];
     
-    // Display main result
-    const emoji = CONFIG.VEGETABLE_EMOJIS[topResult.label] || '🥬';
-    const displayLabel = topResult.label.replace(/_/g, ' ');
-    
-    DOM.resultIcon.textContent = emoji;
-    DOM.resultClass.textContent = displayLabel;
-    DOM.resultConfidence.textContent = topResult.percentage + '%';
+    // Update main result
+    DOM.resultIcon.textContent = CONFIG.VEGETABLE_EMOJIS[topPrediction.class] || '🥬';
+    DOM.resultClass.textContent = topPrediction.class.replace(/_/g, ' ');
+    DOM.resultConfidence.textContent = topPrediction.percentage + '%';
     
     // Animate confidence bar
     setTimeout(() => {
-        DOM.confidenceFill.style.width = topResult.percentage + '%';
+        DOM.confidenceFill.style.width = topPrediction.percentage + '%';
     }, 100);
     
     // Display top 5 predictions
-    displayTop5Predictions(results.slice(0, 5));
+    displayTop5Predictions(predictions);
     
-    // Show results section with animation
-    DOM.resultsSection.classList.remove('hidden');
+    // Show results section
+    DOM.resultsSection.style.display = 'block';
     
-    // Smooth scroll to results
-    setTimeout(() => {
-        DOM.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 200);
+    // Scroll to results
+    DOM.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    
+    console.log('✅ Results displayed');
 }
 
 /**
- * Display top 5 predictions
+ * Display top 5 predictions list
  */
-function displayTop5Predictions(topPredictions) {
+function displayTop5Predictions(predictions) {
     DOM.predictionsList.innerHTML = '';
     
-    topPredictions.forEach((prediction, index) => {
-        const item = createPredictionItem(prediction, index);
+    predictions.forEach((pred, index) => {
+        const item = document.createElement('div');
+        item.className = 'prediction-item';
+        item.style.animationDelay = `${index * 0.1}s`;
+        
+        item.innerHTML = `
+            <div class="prediction-info">
+                <span class="prediction-emoji">${CONFIG.VEGETABLE_EMOJIS[pred.class] || '🥬'}</span>
+                <span class="prediction-name">${pred.class.replace(/_/g, ' ')}</span>
+            </div>
+            <div class="prediction-probability">
+                <span class="prediction-percentage">${pred.percentage}%</span>
+                <div class="prediction-bar">
+                    <div class="prediction-fill" style="width: ${pred.percentage}%"></div>
+                </div>
+            </div>
+        `;
+        
         DOM.predictionsList.appendChild(item);
     });
-}
-
-/**
- * Create a prediction item element
- */
-function createPredictionItem(prediction, index) {
-    const emoji = CONFIG.VEGETABLE_EMOJIS[prediction.label] || '🥬';
-    const displayLabel = prediction.label.replace(/_/g, ' ');
-    
-    const item = document.createElement('div');
-    item.className = 'prediction-item';
-    item.style.animationDelay = `${index * 0.1}s`;
-    
-    item.innerHTML = `
-        <div class="prediction-header">
-            <span class="prediction-label">${emoji} ${displayLabel}</span>
-            <span class="prediction-percentage">${prediction.percentage}%</span>
-        </div>
-        <div class="prediction-bar">
-            <div class="prediction-bar-fill" data-width="${prediction.percentage}"></div>
-        </div>
-    `;
-    
-    // Animate progress bar
-    setTimeout(() => {
-        const bar = item.querySelector('.prediction-bar-fill');
-        bar.style.width = prediction.percentage + '%';
-    }, (index + 1) * 100);
-    
-    return item;
 }
 
 // ==================== UI HELPERS ====================
 /**
  * Show loading indicator
  */
-function showLoading(message = 'Memuat...') {
+function showLoading(message = 'Memproses...') {
+    DOM.loadingIndicator.style.display = 'flex';
     DOM.loadingText.textContent = message;
-    DOM.loadingIndicator.classList.remove('hidden');
 }
 
 /**
  * Hide loading indicator
  */
 function hideLoading() {
-    DOM.loadingIndicator.classList.add('hidden');
+    DOM.loadingIndicator.style.display = 'none';
 }
 
 /**
  * Update model status
  */
 function updateModelStatus(status, message) {
-    const statusDot = DOM.modelStatus.querySelector('.status-dot');
-    const statusText = DOM.modelStatus.querySelector('.status-text');
-    
-    // Remove all status classes
-    statusDot.classList.remove('status-loading', 'status-ready', 'status-error');
-    
-    // Add appropriate status class
-    statusDot.classList.add(`status-${status}`);
-    
-    // Update text
-    statusText.textContent = message;
+    DOM.modelStatus.className = `model-status ${status}`;
+    DOM.modelStatus.textContent = message;
 }
 
 /**
@@ -519,42 +431,21 @@ function showError(message) {
     console.error('Error:', message);
 }
 
-// ==================== TENSOR MEMORY MANAGEMENT ====================
-/**
- * Log TensorFlow.js memory usage (for debugging)
- */
-function logMemoryUsage() {
-    if (tf && tf.memory) {
-        const memInfo = tf.memory();
-        console.log('🧮 TensorFlow.js Memory:', {
-            numTensors: memInfo.numTensors,
-            numBytes: memInfo.numBytes,
-            numDataBuffers: memInfo.numDataBuffers
-        });
-    }
-}
-
-// ==================== APP STARTUP ====================
-// Wait for DOM to be fully loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
-    initApp();
-}
-
-// Log memory usage periodically in development
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    setInterval(logMemoryUsage, 30000); // Every 30 seconds
-}
-
 // ==================== EXPORT FOR DEBUGGING ====================
 window.VegetableClassifier = {
-    model,
-    isModelLoaded,
-    CONFIG,
-    resetUpload,
-    logMemoryUsage
+    config: CONFIG,
+    dom: DOM,
+    state: {
+        get isApiReady() { return isApiReady; },
+        get currentImageFile() { return currentImageFile; }
+    },
+    functions: {
+        checkApiHealth,
+        resetUpload
+    }
 };
 
-console.log('📦 Vegetable AI Classifier loaded');
-console.log('🔧 Debug utilities available at: window.VegetableClassifier');
+// ==================== START APPLICATION ====================
+document.addEventListener('DOMContentLoaded', initApp);
+
+console.log('🥬 Vegetable Classifier loaded (API Mode)');
